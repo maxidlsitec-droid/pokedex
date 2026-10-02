@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pokédex Master - PokéAPI</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        poke: {
+                            red: '#EE1515',
+                            darkred: '#CC0000',
+                            blue: '#3B4CCA',
+                            yellow: '#FFDE00',
+                            gold: '#B3A125'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #0b0f19;
+            color: #f1f5f9;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(238, 21, 21, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(59, 76, 202, 0.08) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* Card Glassmorphism & Hover Animations */
+        .poke-card {
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .poke-card:hover {
+            transform: translateY(-6px) scale(1.02);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        /* Type Badges Glow */
+        .type-badge {
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+        }
+
+        /* Shimmer loading effect */
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+
+        .stat-bar-fill {
+            transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .retro-screen {
+            background: #081811;
+            box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.9), 0 0 12px rgba(34, 197, 94, 0.25);
+            border: 4px solid #1e293b;
+            position: relative;
+        }
+        .retro-screen::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%);
+            background-size: 100% 4px;
+            z-index: 10;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+        .retro-device-shell {
+            background: linear-gradient(145deg, #f87171 0%, #dc2626 50%, #991b1b 100%);
+            box-shadow: 0 25px 50px -12px rgba(185, 28, 28, 0.5), inset 0 3px 6px rgba(255, 255, 255, 0.4), inset 0 -6px 12px rgba(0,0,0,0.5);
+        }
+        .d-pad-btn {
+            background: linear-gradient(145deg, #334155, #0f172a);
+            box-shadow: inset 0 1px 2px rgba(255,255,255,0.2), 0 3px 6px rgba(0,0,0,0.4);
+        }
+        .d-pad-btn:active {
+            transform: scale(0.92);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-rose-500 selection:text-white">
+
+    <!-- Pokédex Header -->
+    <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+            
+            <!-- Pokédex Classic LED lights -->
+            <div class="flex items-center space-x-3">
+                <div class="relative flex items-center justify-center">
+                    <div class="w-10 h-10 rounded-full bg-blue-500 border-4 border-slate-200 shadow-lg shadow-blue-500/50 animate-pulse"></div>
+                    <div class="absolute w-3 h-3 rounded-full bg-blue-200 top-2 left-2"></div>
+                </div>
+                <div class="flex space-x-2">
+                    <span class="w-3.5 h-3.5 rounded-full bg-red-500 border border-slate-900 shadow-md"></span>
+                    <span class="w-3.5 h-3.5 rounded-full bg-yellow-400 border border-slate-900 shadow-md"></span>
+                    <span class="w-3.5 h-3.5 rounded-full bg-emerald-500 border border-slate-900 shadow-md"></span>
+                </div>
+            </div>
+
+            <!-- Brand Logo / Title -->
+            <div class="flex items-center space-x-2 cursor-pointer" id="brand-logo">
+                <i class="fa-solid fa-compact-disc text-rose-500 text-2xl animate-spin" style="animation-duration: 8s;"></i>
+                <h1 class="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-red-500 via-amber-400 to-blue-500 bg-clip-text text-transparent">
+                    POKÉDEX <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono border border-slate-700">v2.0</span>
+                </h1>
+            </div>
+
+            <!-- Header Quick Stats/Actions -->
+            <div class="flex items-center space-x-3">
+                <button id="btn-favorites-toggle" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 text-xs font-semibold flex items-center gap-2 transition">
+                    <i class="fa-solid fa-heart text-rose-500"></i>
+                    <span class="hidden sm:inline">Favoritos</span>
+                    <span id="fav-count-badge" class="px-1.5 py-0.2 rounded-full bg-rose-500/20 text-rose-300 text-[10px]">0</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container with Split View (Retro Device + Catalog) -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- LEFT COLUMN: Retro Pokédex Hardware Device -->
+            <aside class="lg:col-span-5 lg:sticky lg:top-20 z-30">
+                <div class="retro-device-shell rounded-3xl p-5 border-4 border-red-800 shadow-2xl relative overflow-hidden">
+                    
+                    <!-- Pokédex Top Hinge / Camera Lens & Status Lights -->
+                    <div class="flex items-center justify-between pb-4 border-b border-red-700/60 mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="relative flex items-center justify-center">
+                                <div class="w-12 h-12 rounded-full bg-cyan-400 border-4 border-slate-100 shadow-lg shadow-cyan-500/80 animate-pulse flex items-center justify-center">
+                                    <div class="w-4 h-4 rounded-full bg-white opacity-80 -mt-2 -ml-2"></div>
+                                </div>
+                            </div>
+                            <div class="flex space-x-2">
+                                <span class="w-4 h-4 rounded-full bg-red-500 border border-slate-900 shadow-inner"></span>
+                                <span class="w-4 h-4 rounded-full bg-yellow-400 border border-slate-900 shadow-inner"></span>
+                                <span class="w-4 h-4 rounded-full bg-emerald-400 border border-slate-900 shadow-inner"></span>
+                            </div>
+                        </div>
+                        <span class="text-[10px] font-mono tracking-widest text-red-200/80 font-bold uppercase bg-red-950/40 px-2 py-1 rounded border border-red-800">MODEL-88 V2</span>
+                    </div>
+
+                    <!-- Retro Green Screen Container -->
+                    <div class="retro-screen rounded-2xl p-4 border-2 border-slate-800 text-emerald-400 font-mono relative overflow-hidden">
+                        
+                        <!-- Top LCD Bar -->
+                        <div class="flex justify-between items-center text-[11px] border-b border-emerald-900/80 pb-2 mb-3 text-emerald-300 font-bold">
+                            <span id="retro-id-badge"><i class="fa-solid fa-microchip text-emerald-500 mr-1"></i> #---</span>
+                            <span id="retro-status-indicator" class="animate-pulse text-emerald-400 text-[10px]">● REGISTRO ACTIVO</span>
+                        </div>
+
+                        <!-- Pokémon Retro Display Frame -->
+                        <div class="grid grid-cols-12 gap-3 items-center my-2">
+                            <div class="col-span-5 bg-emerald-950/90 border border-emerald-800/80 rounded-xl p-2 text-center relative flex items-center justify-center h-32">
+                                <img id="retro-poke-img" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png" alt="Pokemon Active" class="max-h-28 w-auto object-contain filter drop-shadow-[0_4px_8px_rgba(0,255,100,0.3)]">
+                                <span id="retro-type-label" class="absolute bottom-1 right-1 text-[9px] bg-emerald-900/90 text-emerald-200 px-1.5 py-0.5 rounded font-mono font-bold">ELECTR.</span>
+                            </div>
+
+                            <div class="col-span-7 space-y-1.5 text-xs">
+                                <h3 id="retro-poke-name" class="text-lg font-black tracking-wider uppercase text-emerald-300 truncate">PIKACHU</h3>
+                                
+                                <div class="text-[11px] text-emerald-400/90 space-y-0.5">
+                                    <p><span class="text-emerald-600">ALT:</span> <span id="retro-height">0.4 m</span></p>
+                                    <p><span class="text-emerald-600">PESO:</span> <span id="retro-weight">6.0 kg</span></p>
+                                    <p class="truncate"><span class="text-emerald-600">HAB:</span> <span id="retro-ability">Static</span></p>
+                                </div>
+
+                                <div class="pt-1">
+                                    <button id="retro-btn-cry" class="w-full py-1 px-2 rounded bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 text-[11px] font-bold border border-emerald-700/80 flex items-center justify-center gap-1.5 transition active:scale-95">
+                                        <i class="fa-solid fa-volume-high text-xs"></i>
+                                        <span>REPRODUCIR SONIDO</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Retro Mini Stat Bars -->
+                        <div class="mt-3 pt-2 border-t border-emerald-900/80 text-[10px] space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span>SALUD (PS)</span>
+                                <div class="w-32 bg-emerald-950 rounded-full h-1.5 overflow-hidden border border-emerald-900">
+                                    <div id="retro-bar-hp" class="bg-emerald-400 h-full w-2/3 transition-all duration-500"></div>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span>ATAQUE</span>
+                                <div class="w-32 bg-emerald-950 rounded-full h-1.5 overflow-hidden border border-emerald-900">
+                                    <div id="retro-bar-atk" class="bg-emerald-400 h-full w-1/2 transition-all duration-500"></div>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span>DEFENSA</span>
+                                <div class="w-32 bg-emerald-950 rounded-full h-1.5 overflow-hidden border border-emerald-900">
+                                    <div id="retro-bar-def" class="bg-emerald-400 h-full w-1/2 transition-all duration-500"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Hardware Buttons & D-Pad Section -->
+                    <div class="mt-5 flex items-center justify-between px-2">
+                        
+                        <!-- D-PAD Control -->
+                        <div class="relative w-24 h-24 flex items-center justify-center">
+                            <div class="w-8 h-24 bg-slate-800 rounded-lg absolute shadow-md"></div>
+                            <div class="w-24 h-8 bg-slate-800 rounded-lg absolute shadow-md"></div>
+                            <button id="retro-dpad-up" title="Anterior Pokémon" class="d-pad-btn absolute top-0 w-8 h-8 rounded-t-lg text-slate-300 hover:text-white flex items-center justify-center text-xs z-10"><i class="fa-solid fa-caret-up"></i></button>
+                            <button id="retro-dpad-down" title="Siguiente Pokémon" class="d-pad-btn absolute bottom-0 w-8 h-8 rounded-b-lg text-slate-300 hover:text-white flex items-center justify-center text-xs z-10"><i class="fa-solid fa-caret-down"></i></button>
+                            <button id="retro-dpad-left" title="Anterior" class="d-pad-btn absolute left-0 w-8 h-8 rounded-l-lg text-slate-300 hover:text-white flex items-center justify-center text-xs z-10"><i class="fa-solid fa-caret-left"></i></button>
+                            <button id="retro-dpad-right" title="Siguiente" class="d-pad-btn absolute right-0 w-8 h-8 rounded-r-lg text-slate-300 hover:text-white flex items-center justify-center text-xs z-10"><i class="fa-solid fa-caret-right"></i></button>
+                            <div class="w-4 h-4 bg-slate-900 rounded-full z-20"></div>
+                        </div>
+
+                        <!-- Action Buttons & Speakers -->
+                        <div class="flex flex-col items-end space-y-3">
+                            <div class="flex space-x-3">
+                                <button id="retro-btn-fav" title="Favorito" class="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 border-2 border-slate-600 text-rose-500 flex items-center justify-center shadow-lg active:scale-95 transition">
+                                    <i class="fa-solid fa-heart text-sm"></i>
+                                </button>
+                                <button id="retro-btn-random" title="Pokémon Aleatorio" class="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-500 border-2 border-blue-400 text-white flex items-center justify-center shadow-lg active:scale-95 transition">
+                                    <i class="fa-solid fa-shuffle text-xs"></i>
+                                </button>
+                            </div>
+
+                            <!-- Speaker Slits -->
+                            <div class="flex space-x-1.5 opacity-60 pt-2">
+                                <div class="w-1.5 h-7 bg-slate-900 rounded-full transform -rotate-12"></div>
+                                <div class="w-1.5 h-7 bg-slate-900 rounded-full transform -rotate-12"></div>
+                                <div class="w-1.5 h-7 bg-slate-900 rounded-full transform -rotate-12"></div>
+                                <div class="w-1.5 h-7 bg-slate-900 rounded-full transform -rotate-12"></div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </aside>
+
+            <!-- RIGHT COLUMN: Catalog Search, Filters & Pokémon Grid -->
+            <div class="lg:col-span-7">
+                
+                <!-- Controls & Filters Section -->
+                <section class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 md:p-6 mb-8 shadow-2xl backdrop-blur-md">
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                        
+                        <!-- Search Input -->
+                        <div class="relative md:col-span-5">
+                            <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" id="search-input" placeholder="Buscar por nombre o número (#1, Charizard)..." 
+                                class="w-full pl-11 pr-10 py-3 bg-slate-950/80 border border-slate-700 rounded-xl text-sm focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition placeholder-slate-500 text-slate-100">
+                            <button id="clear-search" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        <!-- Type Selector Filter -->
+                        <div class="md:col-span-4">
+                            <select id="type-filter" class="w-full py-3 px-4 bg-slate-950/80 border border-slate-700 rounded-xl text-sm focus:outline-none focus:border-rose-500 transition text-slate-200 cursor-pointer">
+                                <option value="all">Todos los Tipos</option>
+                                <!-- Options generated dynamically -->
+                            </select>
+                        </div>
+
+                        <!-- Sort Selector -->
+                        <div class="md:col-span-3">
+                            <select id="sort-filter" class="w-full py-3 px-4 bg-slate-950/80 border border-slate-700 rounded-xl text-sm focus:outline-none focus:border-rose-500 transition text-slate-200 cursor-pointer">
+                                <option value="id-asc">Número (# Menor a Mayor)</option>
+                                <option value="id-desc">Número (# Mayor a Menor)</option>
+                                <option value="name-asc">Nombre (A - Z)</option>
+                                <option value="name-desc">Nombre (Z - A)</option>
+                            </select>
+                        </div>
+
+                    </div>
+
+                    <!-- Active Filters Status Bar -->
+                    <div class="mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
+                        <div class="flex items-center gap-2" id="results-count">
+                            <span>Cargando Pokémon...</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button id="btn-reset-filters" class="hover:text-rose-400 transition underline underline-offset-4 hidden">
+                                Limpiar Filtros
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Pokémon Grid -->
+                <section>
+                    <div id="pokemon-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        <!-- Skeleton Loader Placeholders -->
+                    </div>
+
+                    <!-- Empty State / Not Found -->
+                    <div id="empty-state" class="hidden py-16 text-center space-y-4">
+                        <div class="w-20 h-20 mx-auto rounded-full bg-slate-800 flex items-center justify-center text-slate-500 text-3xl">
+                            <i class="fa-solid fa-ghost"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-300">No se encontraron Pokémon</h3>
+                        <p class="text-sm text-slate-500 max-w-md mx-auto">Prueba con otro término de búsqueda o ajusta los filtros seleccionados.</p>
+                    </div>
+
+                    <!-- Load More / Pagination -->
+                    <div class="mt-10 text-center flex flex-col items-center gap-3" id="pagination-container">
+                        <button id="btn-load-more" class="px-8 py-3 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 active:scale-95 text-white font-bold rounded-xl shadow-lg shadow-rose-900/30 transition flex items-center gap-2">
+                            <i class="fa-solid fa-plus text-xs"></i>
+                            <span>Cargar más Pokémon</span>
+                        </button>
+                        <span id="page-indicator" class="text-xs font-mono text-slate-500">Mostrando 0 de 0</span>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Pokémon Detail Modal -->
+    <div id="pokemon-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="relative w-full max-w-2xl bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden my-8 transform transition-all">
+            
+            <!-- Modal Header / Background Banner -->
+            <div id="modal-banner" class="relative h-48 bg-gradient-to-br from-slate-800 to-slate-900 p-6 flex justify-between items-start">
+                <button id="modal-close-btn" class="w-9 h-9 rounded-full bg-slate-950/60 hover:bg-slate-950 text-slate-300 flex items-center justify-center transition z-10 border border-slate-700">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+
+                <!-- Favorite Button -->
+                <button id="modal-fav-btn" class="w-9 h-9 rounded-full bg-slate-950/60 hover:bg-slate-950 text-slate-300 flex items-center justify-center transition z-10 border border-slate-700">
+                    <i class="fa-regular fa-heart text-lg text-rose-500"></i>
+                </button>
+
+                <!-- Floating Watermark ID -->
+                <span id="modal-pokemon-id" class="absolute bottom-2 right-4 font-mono font-black text-6xl text-white/10 select-none">#000</span>
+            </div>
+
+            <!-- Pokémon Image Floating Container -->
+            <div class="relative -mt-24 text-center px-6">
+                <div class="relative inline-block group">
+                    <img id="modal-pokemon-img" src="" alt="Pokemon" class="w-44 h-44 mx-auto object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)] transition duration-300 group-hover:scale-105">
+                    
+                    <!-- Sound Audio Button -->
+                    <button id="btn-play-cry" title="Escuchar grito del Pokémon" class="absolute -bottom-2 right-2 bg-amber-500 hover:bg-amber-400 text-slate-950 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition active:scale-90 border-2 border-slate-900">
+                        <i class="fa-solid fa-volume-high text-sm"></i>
+                    </button>
+                </div>
+                
+                <h2 id="modal-pokemon-name" class="text-3xl font-extrabold capitalize mt-3 text-slate-100 tracking-wide">--</h2>
+                <div id="modal-types" class="flex justify-center gap-2 mt-2">
+                    <!-- Type badges injected here -->
+                </div>
+            </div>
+
+            <!-- Modal Tab Navigation -->
+            <div class="p-6 space-y-6">
+                
+                <!-- Measurements (Height / Weight) -->
+                <div class="grid grid-cols-2 gap-4 bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-center">
+                    <div>
+                        <span class="block text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1"><i class="fa-solid fa-ruler-vertical text-amber-400 mr-1"></i> Altura</span>
+                        <span id="modal-height" class="text-base font-bold font-mono text-slate-200">-- m</span>
+                    </div>
+                    <div>
+                        <span class="block text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1"><i class="fa-solid fa-weight-hanging text-amber-400 mr-1"></i> Peso</span>
+                        <span id="modal-weight" class="text-base font-bold font-mono text-slate-200">-- kg</span>
+                    </div>
+                </div>
+
+                <!-- Abilities Section -->
+                <div>
+                    <h3 class="text-xs uppercase tracking-wider font-bold text-slate-400 mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-bolt text-yellow-400"></i> Habilidades
+                    </h3>
+                    <div id="modal-abilities" class="flex flex-wrap gap-2">
+                        <!-- Ability Pills -->
+                    </div>
+                </div>
+
+                <!-- Base Stats Section -->
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-xs uppercase tracking-wider font-bold text-slate-400 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-simple text-rose-400"></i> Estadísticas Base
+                        </h3>
+                        <span id="modal-total-stats" class="text-xs font-mono font-semibold text-slate-400">Total: 0</span>
+                    </div>
+
+                    <div id="modal-stats-container" class="space-y-2.5 font-mono text-xs">
+                        <!-- Stats dynamic rows -->
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 bg-slate-800 border border-slate-700 text-slate-100 px-4 py-3 rounded-xl shadow-2xl transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3">
+        <i id="toast-icon" class="fa-solid fa-circle-info text-rose-400"></i>
+        <span id="toast-message" class="text-xs font-medium">Notificación</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-slate-950 border-t border-slate-900 py-6 text-center text-xs text-slate-500">
+        <p class="max-w-7xl mx-auto px-4">
+            Pokédex Web App powered by <a href="https://pokeapi.co/" target="_blank" rel="noopener" class="text-rose-400 hover:underline">PokéAPI</a>. Pokémon y sus nombres son marca registrada de Nintendo / Game Freak.
+        </p>
+    </footer>
+
+    <script>
+        // TYPE COLORS DICTIONARY
+        const TYPE_COLORS = {
+            normal:   { bg: '#A8A77A', gradient: 'from-amber-600/30 to-slate-800' },
+            fire:     { bg: '#EE8130', gradient: 'from-orange-600/40 to-red-950' },
+            water:    { bg: '#6390F0', gradient: 'from-blue-600/40 to-slate-900' },
+            electric: { bg: '#F7D02C', gradient: 'from-yellow-500/40 to-slate-900' },
+            grass:    { bg: '#7AC74C', gradient: 'from-emerald-600/40 to-slate-900' },
+            ice:      { bg: '#96D9D6', gradient: 'from-cyan-500/40 to-slate-900' },
+            fighting: { bg: '#C22E28', gradient: 'from-red-700/40 to-slate-900' },
+            poison:   { bg: '#A33EA1', gradient: 'from-purple-600/40 to-slate-900' },
+            ground:   { bg: '#E2BF65', gradient: 'from-amber-700/40 to-slate-900' },
+            flying:   { bg: '#A98FF3', gradient: 'from-indigo-500/40 to-slate-900' },
+            psychic:  { bg: '#F95587', gradient: 'from-pink-600/40 to-slate-900' },
+            bug:      { bg: '#A6B91A', gradient: 'from-lime-600/40 to-slate-900' },
+            rock:     { bg: '#B6A136', gradient: 'from-yellow-700/40 to-slate-900' },
+            ghost:    { bg: '#735797', gradient: 'from-purple-800/40 to-slate-900' },
+            dragon:   { bg: '#6F35FC', gradient: 'from-indigo-700/40 to-slate-900' },
+            steel:    { bg: '#B7B7CE', gradient: 'from-slate-500/40 to-slate-900' },
+            fairy:    { bg: '#D685AD', gradient: 'from-rose-400/40 to-slate-900' },
+            dark:     { bg: '#705746', gradient: 'from-stone-800 to-slate-950' }
+        };
+
+        const STAT_NAMES_ES = {
+            'hp': 'PS',
+            'attack': 'Ataque',
+            'defense': 'Defensa',
+            'special-attack': 'At. Esp.',
+            'special-defense': 'Def. Esp.',
+            'speed': 'Velocidad'
+        };
+
+        // APPLICATION STATE
+        const state = {
+            allPokemonSummaries: [], // [{ name, url, id }]
+            displayedPokemon: [],
+            favorites: JSON.parse(localStorage.getItem('pokedex_favs') || '[]'),
+            offset: 0,
+            limit: 24,
+            currentFilterType: 'all',
+            currentSearchTerm: '',
+            currentSort: 'id-asc',
+            showingOnlyFavorites: false,
+            activePokemonData: null,
+            audioPlayer: new Audio()
+        };
+
+        // DOM ELEMENTS
+        const grid = document.getElementById('pokemon-grid');
+        const searchInput = document.getElementById('search-input');
+        const typeFilter = document.getElementById('type-filter');
+        const sortFilter = document.getElementById('sort-filter');
+        const btnLoadMore = document.getElementById('btn-load-more');
+        const pageIndicator = document.getElementById('page-indicator');
+        const resultsCount = document.getElementById('results-count');
+        const emptyState = document.getElementById('empty-state');
+        const btnResetFilters = document.getElementById('btn-reset-filters');
+        const favCountBadge = document.getElementById('fav-count-badge');
+        const btnFavoritesToggle = document.getElementById('btn-favorites-toggle');
+        const modal = document.getElementById('pokemon-modal');
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            initTypeFilterOptions();
+            updateFavBadge();
+            setupEventListeners();
+            showSkeletons(12);
+
+            try {
+                // Fetch basic list of first 1000 Pokémon for instant local search/sorting
+                const response = await fetch('https://pokeapi.co/api/v2/pokemon?limit=1000&offset=0');
+                const data = await response.json();
+                
+                state.allPokemonSummaries = data.results.map((item) => {
+                    const idMatch = item.url.match(/\/pokemon\/(\d+)\//);
+                    const id = idMatch ? parseInt(idMatch[1]) : 0;
+                    return { ...item, id };
+                }).filter(p => p.id <= 1025); // Valid gen range
+
+                await loadNextBatch(true);
+            } catch (error) {
+                showToast('Error al conectar con PokéAPI. Intenta recargar.', 'error');
+            }
+        });
+
+        function initTypeFilterOptions() {
+            Object.keys(TYPE_COLORS).forEach(type => {
+                const opt = document.createElement('option');
+                opt.value = type;
+                opt.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+                typeFilter.appendChild(opt);
+            });
+        }
+
+        function showSkeletons(count) {
+            grid.innerHTML = '';
+            for (let i = 0; i < count; i++) {
+                const skel = document.createElement('div');
+                skel.className = 'rounded-2xl p-4 skeleton h-64 border border-slate-800';
+                grid.appendChild(skel);
+            }
+        }
+
+        const pokemonCache = new Map();
+
+        async function fetchPokemonDetails(idOrName) {
+            const key = idOrName.toString().toLowerCase();
+            if (pokemonCache.has(key)) return pokemonCache.get(key);
+
+            try {
+                const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${key}`);
+                if (!res.ok) return null;
+                const data = await res.json();
+                pokemonCache.set(key, data);
+                pokemonCache.set(data.id.toString(), data);
+                return data;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function loadNextBatch(reset = false) {
+            if (reset) {
+                state.offset = 0;
+                grid.innerHTML = '';
+                showSkeletons(12);
+            }
+
+            let filteredList = filterAndSortPokemon();
+
+            const batchToFetch = filteredList.slice(state.offset, state.offset + state.limit);
+            
+            if (reset) grid.innerHTML = '';
+
+            if (filteredList.length === 0) {
+                emptyState.classList.remove('hidden');
+                btnLoadMore.classList.add('hidden');
+                pageIndicator.textContent = '0 Pokémon encontrados';
+                resultsCount.innerHTML = `<span>Mostrando 0 resultados</span>`;
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            // Fetch detail batch in parallel
+            const detailsPromises = batchToFetch.map(item => fetchPokemonDetails(item.id || item.name));
+            const detailsResults = await Promise.all(detailsPromises);
+
+            detailsResults.filter(p => p !== null).forEach(pokemon => {
+                const card = createPokemonCard(pokemon);
+                grid.appendChild(card);
+            });
+
+            if (reset && detailsResults.length > 0 && detailsResults[0]) {
+                updateRetroPokedex(detailsResults[0]);
+            }
+
+            state.offset += batchToFetch.length;
+
+            // Update UI Counters
+            const total = filteredList.length;
+            const current = Math.min(state.offset, total);
+            pageIndicator.textContent = `Mostrando ${current} de ${total}`;
+            resultsCount.innerHTML = `<span>Se encontraron <strong>${total}</strong> Pokémon</span>`;
+
+            if (current >= total) {
+                btnLoadMore.classList.add('hidden');
+            } else {
+                btnLoadMore.classList.remove('hidden');
+            }
+        }
+
+        function updateRetroPokedex(pokemon) {
+            if (!pokemon) return;
+            state.activePokemonData = pokemon;
+
+            document.getElementById('retro-id-badge').innerHTML = `<i class="fa-solid fa-microchip text-emerald-500 mr-1"></i> #${String(pokemon.id).padStart(3, '0')}`;
+            document.getElementById('retro-poke-name').textContent = pokemon.name;
+
+            const imgUrl = pokemon.sprites.other['official-artwork'].front_default 
+                        || pokemon.sprites.front_default;
+            document.getElementById('retro-poke-img').src = imgUrl;
+
+            document.getElementById('retro-height').textContent = `${(pokemon.height / 10).toFixed(1)} m`;
+            document.getElementById('retro-weight').textContent = `${(pokemon.weight / 10).toFixed(1)} kg`;
+
+            const firstType = pokemon.types[0]?.type.name || 'normal';
+            document.getElementById('retro-type-label').textContent = firstType.toUpperCase();
+
+            const ability = pokemon.abilities[0]?.ability.name.replace('-', ' ') || 'None';
+            document.getElementById('retro-ability').textContent = ability;
+
+            // Update mini stats bars
+            const hp = pokemon.stats.find(s => s.stat.name === 'hp')?.base_stat || 50;
+            const atk = pokemon.stats.find(s => s.stat.name === 'attack')?.base_stat || 50;
+            const def = pokemon.stats.find(s => s.stat.name === 'defense')?.base_stat || 50;
+
+            document.getElementById('retro-bar-hp').style.width = `${Math.min(100, Math.round((hp / 200) * 100))}%`;
+            document.getElementById('retro-bar-atk').style.width = `${Math.min(100, Math.round((atk / 200) * 100))}%`;
+            document.getElementById('retro-bar-def').style.width = `${Math.min(100, Math.round((def / 200) * 100))}%`;
+
+            // Update fav button on device
+            const isFav = state.favorites.includes(pokemon.id);
+            const retroFavBtn = document.getElementById('retro-btn-fav');
+            retroFavBtn.innerHTML = `<i class="${isFav ? 'fa-solid text-rose-500' : 'fa-regular'} fa-heart text-sm"></i>`;
+        }
+
+        function filterAndSortPokemon() {
+            let list = [...state.allPokemonSummaries];
+
+            // Favorites filter
+            if (state.showingOnlyFavorites) {
+                list = list.filter(p => state.favorites.includes(p.id));
+            }
+
+            // Search filter
+            if (state.currentSearchTerm.trim() !== '') {
+                const term = state.currentSearchTerm.toLowerCase().trim();
+                list = list.filter(p => {
+                    return p.name.includes(term) || p.id.toString() === term || `#${p.id}` === term;
+                });
+            }
+
+            // Sort
+            list.sort((a, b) => {
+                if (state.currentSort === 'id-asc') return a.id - b.id;
+                if (state.currentSort === 'id-desc') return b.id - a.id;
+                if (state.currentSort === 'name-asc') return a.name.localeCompare(b.name);
+                if (state.currentSort === 'name-desc') return b.name.localeCompare(a.name);
+                return 0;
+            });
+
+            return list;
+        }
+
+        function createPokemonCard(pokemon) {
+            const card = document.createElement('div');
+            card.className = 'poke-card rounded-2xl p-4 flex flex-col justify-between cursor-pointer relative group overflow-hidden';
+            
+            const mainType = pokemon.types[0]?.type.name || 'normal';
+            const typeConfig = TYPE_COLORS[mainType] || TYPE_COLORS.normal;
+            
+            // Image fallback chain
+            const imgUrl = pokemon.sprites.other['official-artwork'].front_default 
+                        || pokemon.sprites.other.dream_world.front_default 
+                        || pokemon.sprites.front_default;
+
+            const isFav = state.favorites.includes(pokemon.id);
+
+            card.innerHTML = `
+                <!-- Background subtle type glow -->
+                <div class="absolute -right-8 -bottom-8 w-28 h-28 rounded-full opacity-20 filter blur-xl" style="background-color: ${typeConfig.bg}"></div>
+
+                <!-- Card Header -->
+                <div class="flex justify-between items-center z-10">
+                    <span class="font-mono text-xs font-bold text-slate-400">#${String(pokemon.id).padStart(3, '0')}</span>
+                    <button class="btn-fav text-slate-500 hover:text-rose-500 transition text-sm p-1" data-id="${pokemon.id}">
+                        <i class="${isFav ? 'fa-solid text-rose-500' : 'fa-regular'} fa-heart"></i>
+                    </button>
+                </div>
+
+                <!-- Pokémon Sprite -->
+                <div class="my-3 text-center z-10">
+                    <img src="${imgUrl}" alt="${pokemon.name}" loading="lazy" 
+                         class="w-28 h-28 mx-auto object-contain drop-shadow-md group-hover:scale-110 transition duration-300">
+                </div>
+
+                <!-- Name & Types -->
+                <div class="z-10">
+                    <h3 class="text-base font-bold capitalize text-slate-100 mb-2 truncate">${pokemon.name}</h3>
+                    <div class="flex flex-wrap gap-1">
+                        ${pokemon.types.map(t => {
+                            const tc = TYPE_COLORS[t.type.name] || TYPE_COLORS.normal;
+                            return `<span class="type-badge text-[10px] uppercase font-bold px-2 py-0.5 rounded-md text-white tracking-wider" style="background-color: ${tc.bg}">${t.type.name}</span>`;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+
+            // Open Detail Modal & update retro pokedex on click
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.btn-fav')) return;
+                updateRetroPokedex(pokemon);
+                openModal(pokemon);
+            });
+
+            // Toggle favorite click handler
+            const favBtn = card.querySelector('.btn-fav');
+            favBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleFavorite(pokemon.id);
+                const icon = favBtn.querySelector('i');
+                const isNowFav = state.favorites.includes(pokemon.id);
+                icon.className = `${isNowFav ? 'fa-solid text-rose-500' : 'fa-regular'} fa-heart`;
+            });
+
+            return card;
+        }
+
+        function openModal(pokemon) {
+            state.activePokemonData = pokemon;
+
+            const mainType = pokemon.types[0]?.type.name || 'normal';
+            const typeConfig = TYPE_COLORS[mainType] || TYPE_COLORS.normal;
+
+            const modalBanner = document.getElementById('modal-banner');
+            modalBanner.className = `relative h-48 bg-gradient-to-br ${typeConfig.gradient} p-6 flex justify-between items-start border-b border-slate-700/50`;
+
+            document.getElementById('modal-pokemon-id').textContent = `#${String(pokemon.id).padStart(3, '0')}`;
+            document.getElementById('modal-pokemon-name').textContent = pokemon.name;
+
+            const imgUrl = pokemon.sprites.other['official-artwork'].front_default || pokemon.sprites.front_default;
+            document.getElementById('modal-pokemon-img').src = imgUrl;
+
+            // Types
+            const typesContainer = document.getElementById('modal-types');
+            typesContainer.innerHTML = pokemon.types.map(t => {
+                const tc = TYPE_COLORS[t.type.name] || TYPE_COLORS.normal;
+                return `<span class="type-badge text-xs uppercase font-bold px-3 py-1 rounded-lg text-white shadow" style="background-color: ${tc.bg}">${t.type.name}</span>`;
+            }).join('');
+
+            // Measurements
+            document.getElementById('modal-height').textContent = `${(pokemon.height / 10).toFixed(1)} m`;
+            document.getElementById('modal-weight').textContent = `${(pokemon.weight / 10).toFixed(1)} kg`;
+
+            // Abilities
+            const abilitiesContainer = document.getElementById('modal-abilities');
+            abilitiesContainer.innerHTML = pokemon.abilities.map(a => `
+                <span class="px-3 py-1 rounded-xl bg-slate-800 border border-slate-700 text-xs font-semibold capitalize text-slate-200 ${a.is_hidden ? 'border-amber-500/50 text-amber-300' : ''}">
+                    ${a.ability.name.replace('-', ' ')} ${a.is_hidden ? '<span class="text-[10px] text-amber-400 ml-1">(Oculta)</span>' : ''}
+                </span>
+            `).join('');
+
+            // Base Stats
+            const statsContainer = document.getElementById('modal-stats-container');
+            statsContainer.innerHTML = '';
+            let totalStats = 0;
+
+            pokemon.stats.forEach(st => {
+                totalStats += st.base_stat;
+                const statName = STAT_NAMES_ES[st.stat.name] || st.stat.name;
+                const percentage = Math.min(100, Math.round((st.base_stat / 255) * 100));
+
+                let barColor = 'bg-red-500';
+                if (st.base_stat >= 90) barColor = 'bg-emerald-500';
+                else if (st.base_stat >= 60) barColor = 'bg-amber-500';
+
+                const row = document.createElement('div');
+                row.className = 'grid grid-cols-12 items-center gap-2';
+                row.innerHTML = `
+                    <span class="col-span-4 text-slate-400 truncate">${statName}</span>
+                    <span class="col-span-2 text-right font-bold text-slate-100">${st.base_stat}</span>
+                    <div class="col-span-6 bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800">
+                        <div class="stat-bar-fill h-full rounded-full ${barColor}" style="width: 0%"></div>
+                    </div>
+                `;
+                statsContainer.appendChild(row);
+
+                // Animate bar width
+                setTimeout(() => {
+                    const bar = row.querySelector('.stat-bar-fill');
+                    if (bar) bar.style.width = `${percentage}%`;
+                }, 50);
+            });
+
+            document.getElementById('modal-total-stats').textContent = `Total: ${totalStats}`;
+
+            // Update Fav button icon in modal
+            const isFav = state.favorites.includes(pokemon.id);
+            const modalFavBtn = document.getElementById('modal-fav-btn');
+            modalFavBtn.innerHTML = `<i class="${isFav ? 'fa-solid text-rose-500' : 'fa-regular'} fa-heart text-lg"></i>`;
+
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function setupEventListeners() {
+            // Search Input with debounce
+            let searchTimeout;
+            searchInput.addEventListener('input', (e) => {
+                state.currentSearchTerm = e.target.value;
+                document.getElementById('clear-search').classList.toggle('hidden', state.currentSearchTerm === '');
+                checkActiveFilters();
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => loadNextBatch(true), 300);
+            });
+
+            document.getElementById('clear-search').addEventListener('click', () => {
+                searchInput.value = '';
+                state.currentSearchTerm = '';
+                document.getElementById('clear-search').classList.add('hidden');
+                checkActiveFilters();
+                loadNextBatch(true);
+            });
+
+            // Type filter change listener
+            typeFilter.addEventListener('change', async (e) => {
+                const val = e.target.value;
+                state.currentFilterType = val;
+                checkActiveFilters();
+
+                if (val === 'all') {
+                    // Restore full list
+                    const response = await fetch('https://pokeapi.co/api/v2/pokemon?limit=1000&offset=0');
+                    const data = await response.json();
+                    state.allPokemonSummaries = data.results.map((item) => {
+                        const idMatch = item.url.match(/\/pokemon\/(\d+)\//);
+                        return { ...item, id: idMatch ? parseInt(idMatch[1]) : 0 };
+                    }).filter(p => p.id <= 1025);
+                } else {
+                    // Fetch all Pokémon for selected type from API
+                    showSkeletons(12);
+                    try {
+                        const res = await fetch(`https://pokeapi.co/api/v2/type/${val}`);
+                        const data = await res.json();
+                        state.allPokemonSummaries = data.pokemon.map(p => {
+                            const idMatch = p.pokemon.url.match(/\/pokemon\/(\d+)\//);
+                            return { name: p.pokemon.name, url: p.pokemon.url, id: idMatch ? parseInt(idMatch[1]) : 0 };
+                        }).filter(p => p.id <= 1025);
+                    } catch (e) {
+                        showToast('Error al filtrar por tipo', 'error');
+                    }
+                }
+
+                loadNextBatch(true);
+            });
+
+            // Sort change
+            sortFilter.addEventListener('change', (e) => {
+                state.currentSort = e.target.value;
+                loadNextBatch(true);
+            });
+
+            // Load More button
+            btnLoadMore.addEventListener('click', () => loadNextBatch(false));
+
+            // Favorites view toggle
+            btnFavoritesToggle.addEventListener('click', () => {
+                state.showingOnlyFavorites = !state.showingOnlyFavorites;
+                btnFavoritesToggle.classList.toggle('bg-rose-500/20', state.showingOnlyFavorites);
+                btnFavoritesToggle.classList.toggle('border-rose-500', state.showingOnlyFavorites);
+                checkActiveFilters();
+                loadNextBatch(true);
+            });
+
+            // Reset filters
+            btnResetFilters.addEventListener('click', () => {
+                searchInput.value = '';
+                typeFilter.value = 'all';
+                sortFilter.value = 'id-asc';
+                state.currentSearchTerm = '';
+                state.currentFilterType = 'all';
+                state.currentSort = 'id-asc';
+                state.showingOnlyFavorites = false;
+                btnFavoritesToggle.classList.remove('bg-rose-500/20', 'border-rose-500');
+                checkActiveFilters();
+                typeFilter.dispatchEvent(new Event('change'));
+            });
+
+            // Close Modal
+            document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal();
+            });
+
+            // Play Pokémon cry audio
+            document.getElementById('btn-play-cry').addEventListener('click', () => {
+                if (!state.activePokemonData) return;
+                const cries = state.activePokemonData.cries;
+                const audioUrl = cries?.latest || cries?.legacy;
+
+                if (audioUrl) {
+                    state.audioPlayer.src = audioUrl;
+                    state.audioPlayer.play().catch(() => {
+                        showToast('No se pudo reproducir el sonido', 'error');
+                    });
+                } else {
+                    showToast('Este Pokémon no tiene audio disponible', 'info');
+                }
+            });
+
+            // Modal Favorite toggle button
+            document.getElementById('modal-fav-btn').addEventListener('click', () => {
+                if (!state.activePokemonData) return;
+                toggleFavorite(state.activePokemonData.id);
+                const isFav = state.favorites.includes(state.activePokemonData.id);
+                document.getElementById('modal-fav-btn').innerHTML = `<i class="${isFav ? 'fa-solid text-rose-500' : 'fa-regular'} fa-heart text-lg"></i>`;
+                loadNextBatch(true);
+            });
+
+            // Logo click to scroll top & reset
+            document.getElementById('brand-logo').addEventListener('click', () => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+
+            // Retro device sound cry button
+            document.getElementById('retro-btn-cry').addEventListener('click', () => {
+                if (!state.activePokemonData) return;
+                const cries = state.activePokemonData.cries;
+                const audioUrl = cries?.latest || cries?.legacy;
+
+                if (audioUrl) {
+                    state.audioPlayer.src = audioUrl;
+                    state.audioPlayer.play().catch(() => {
+                        showToast('No se pudo reproducir el sonido', 'error');
+                    });
+                } else {
+                    showToast('Este Pokémon no tiene audio disponible', 'info');
+                }
+            });
+
+            // Retro device favorite toggle button
+            document.getElementById('retro-btn-fav').addEventListener('click', () => {
+                if (!state.activePokemonData) return;
+                toggleFavorite(state.activePokemonData.id);
+                updateRetroPokedex(state.activePokemonData);
+                loadNextBatch(true);
+            });
+
+            // Retro device random Pokemon button
+            document.getElementById('retro-btn-random').addEventListener('click', async () => {
+                const randomId = Math.floor(Math.random() * 898) + 1;
+                const randomPokemon = await fetchPokemonDetails(randomId);
+                if (randomPokemon) {
+                    updateRetroPokedex(randomPokemon);
+                    showToast(`¡Pokémon #${randomId} cargado en Pokédex!`, 'success');
+                }
+            });
+
+            // Retro device D-Pad Navigation
+            const handleNav = async (step) => {
+                if (!state.activePokemonData) return;
+                let newId = state.activePokemonData.id + step;
+                if (newId < 1) newId = 1025;
+                if (newId > 1025) newId = 1;
+
+                const nextPokemon = await fetchPokemonDetails(newId);
+                if (nextPokemon) updateRetroPokedex(nextPokemon);
+            };
+
+            document.getElementById('retro-dpad-up').addEventListener('click', () => handleNav(-1));
+            document.getElementById('retro-dpad-left').addEventListener('click', () => handleNav(-1));
+            document.getElementById('retro-dpad-down').addEventListener('click', () => handleNav(1));
+            document.getElementById('retro-dpad-right').addEventListener('click', () => handleNav(1));
+        }
+
+        function closeModal() {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+            state.activePokemonData = null;
+        }
+
+        function toggleFavorite(id) {
+            const index = state.favorites.indexOf(id);
+            if (index > -1) {
+                state.favorites.splice(index, 1);
+                showToast('Eliminado de favoritos');
+            } else {
+                state.favorites.push(id);
+                showToast('Añadido a favoritos', 'success');
+            }
+            localStorage.setItem('pokedex_favs', JSON.stringify(state.favorites));
+            updateFavBadge();
+        }
+
+        function updateFavBadge() {
+            favCountBadge.textContent = state.favorites.length;
+        }
+
+        function checkActiveFilters() {
+            const hasActive = state.currentSearchTerm !== '' || state.currentFilterType !== 'all' || state.showingOnlyFavorites;
+            btnResetFilters.classList.toggle('hidden', !hasActive);
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            const toastIcon = document.getElementById('toast-icon');
+
+            toastMessage.textContent = message;
+
+            if (type === 'success') toastIcon.className = 'fa-solid fa-circle-check text-emerald-400';
+            else if (type === 'error') toastIcon.className = 'fa-solid fa-circle-exclamation text-rose-400';
+            else toastIcon.className = 'fa-solid fa-circle-info text-amber-400';
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
